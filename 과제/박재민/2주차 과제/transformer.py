@@ -21,23 +21,8 @@ print("Original Text:", text.split())
 print("Tokenized:", token_ids.tolist())
 print("Embedded Vectors:\n", embedded)
 
-# Positional Encoding
-# transformer는 RNN과 달리 순차적이지 않기 때문에 단어에 위치를 찾기 위해 positional Encoding을 사용한다
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=5000):
-        super().__init__()
-        self.encoding = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len).unsqueeze(1).float()
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model))
-        self.encoding[:, 0::2] = torch.sin(position * div_term)
-        self.encoding[:, 1::2] = torch.cos(position * div_term)
-        self.encoding = self.encoding.unsqueeze(0)
-
-    def forward(self, x):
-        return x + self.encoding[:, :x.size(1)].to(x.device)
-
 # Layer Normalization
-# 모델에 학습을 안정화하고 수렴속도를 높이는 정규화 기법class LayerNorm(nn.Module):
+# 모델에 학습을 안정화하고 수렴속도를 높이는 정규화 기법
 class LayerNorm(nn.Module):
     def __init__(self, d_model, eps=1e-6):
         super().__init__()
@@ -107,46 +92,6 @@ class FeedForward(nn.Module):
     def forward(self, x):
         return self.linear2(self.dropout(F.relu(self.linear1(x))))
 
-# Encoder Layer
-class EncoderLayer(nn.Module):
-    def __init__(self, d_model, num_heads, d_ff, dropout):
-        super().__init__()
-        self.self_attn = MultiHeadAttention(d_model, num_heads)
-        self.feed_forward = FeedForward(d_model, d_ff)
-        self.norm1 = LayerNorm(d_model)
-        self.norm2 = LayerNorm(d_model)
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x, mask=None):
-        # Self-Attention
-        attn = self.self_attn(x, x, x, mask)
-        x = x + self.dropout(attn)
-        x = self.norm1(x)
-        
-        # Feed Forward
-        ff = self.feed_forward(x)
-        x = x + self.dropout(ff)
-        x = self.norm2(x)
-        
-        return x
-
-# Encoder
-class Encoder(nn.Module):
-    def __init__(self, num_layers, d_model, num_heads, d_ff, dropout):
-        super().__init__()
-        self.layers = nn.ModuleList([
-            EncoderLayer(d_model, num_heads, d_ff, dropout)
-            for _ in range(num_layers)
-        ])
-        self.norm = LayerNorm(d_model)
-        self.positional_encoding = PositionalEncoding(d_model)
-
-    def forward(self, x, mask=None):
-        x = self.positional_encoding(x)
-        for layer in self.layers:
-            x = layer(x, mask)
-        return self.norm(x)
-
 # Decoder Layer
 class DecoderLayer(nn.Module):
     def __init__(self, d_model, num_heads, d_ff, dropout):
@@ -185,20 +130,19 @@ class Decoder(nn.Module):
 
 # 하이퍼파라미터
 MODEL_DIM = 128
-NUM_HEADS = 8
-NUM_LAYERS = 6
+NUM_HEADS = 6
+NUM_LAYERS = 2
 D_FF = 64
-DROPOUT = 0.3
+DROPOUT = 0.1
 
 # Model Initialization
-encoder = Encoder(NUM_LAYERS, MODEL_DIM, NUM_HEADS, D_FF, DROPOUT)
 decoder = Decoder(NUM_LAYERS, MODEL_DIM, NUM_HEADS, D_FF, DROPOUT)
 
 # Input Preparation
 src = embedded.unsqueeze(0)  # Add batch dimension
-enc_output = encoder(src)
+enc_output = torch.rand(1, src.size(1), MODEL_DIM)
 src_mask = tgt_mask = None
 
 output = decoder(src, enc_output, src_mask, tgt_mask)
 
-print("결과:\n", output)
+print("Decoder Output:\n", output)
